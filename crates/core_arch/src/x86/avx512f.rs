@@ -6,6 +6,13 @@ use crate::{
 #[cfg(test)]
 use stdsimd_test::assert_instr;
 
+#[inline]
+#[target_feature(enable = "avx512f")]
+#[cfg_attr(test, assert_instr(vpaddq))]
+pub unsafe fn _mm512_add_epi64(a: __m512i, b: __m512i) -> __m512i {
+    transmute(simd_add(a.as_i64x8(), b.as_i64x8()))
+}
+
 /// Computes the absolute values of packed 32-bit integers in `a`.
 ///
 /// [Intel's documentation](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#avx512techs=AVX512F&expand=33,34,4990,33&text=_mm512_abs_epi32)

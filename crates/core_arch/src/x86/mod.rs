@@ -466,6 +466,11 @@ pub(crate) trait m512iExt: Sized {
     fn as_i32x16(self) -> crate::core_arch::simd::i32x16 {
         unsafe { transmute(self.as_m512i()) }
     }
+
+    #[inline]
+    fn as_i64x8(self) -> crate::core_arch::simd::i64x8 {
+        unsafe { transmute(self.as_m512i()) }
+    }
 }
 
 impl m512iExt for __m512i {
