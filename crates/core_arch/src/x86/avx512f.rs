@@ -1,6 +1,7 @@
 use crate::{
     core_arch::{simd::*, simd_llvm::*, x86::*},
     mem::{self, transmute},
+    ptr,
 };
 
 #[cfg(test)]
@@ -96,6 +97,27 @@ pub unsafe fn _mm512_set1_epi64(a: i64) -> __m512i {
 
 #[inline]
 #[target_feature(enable = "avx512f")]
+#[cfg_attr(test, assert_instr(vmovups))] // FIXME vmovdqu32 expected
+pub unsafe fn _mm512_loadu_si512(mem_addr: *const __m512i) -> __m512i {
+    ptr::read_unaligned(mem_addr)
+}
+
+#[inline]
+#[target_feature(enable = "avx512f")]
+#[cfg_attr(test, assert_instr(vmovups))] // FIXME vmovdqu32 expected
+pub unsafe fn _mm512_storeu_si512(mem_addr: *mut __m512i, a: __m512i) {
+    ptr::write_unaligned(mem_addr, a)
+}
+
+#[inline]
+#[target_feature(enable = "avx512f")]
+#[cfg_attr(test, assert_instr(vpaddd))]
+pub unsafe fn _mm512_add_epi32(a: __m512i, b: __m512i) -> __m512i {
+    transmute(simd_add(a.as_i32x16(), b.as_i32x16()))
+}
+
+#[inline]
+#[target_feature(enable = "avx512f")]
 #[cfg_attr(test, assert_instr(vpaddq))]
 pub unsafe fn _mm512_add_epi64(a: __m512i, b: __m512i) -> __m512i {
     transmute(simd_add(a.as_i64x8(), b.as_i64x8()))
@@ -103,22 +125,97 @@ pub unsafe fn _mm512_add_epi64(a: __m512i, b: __m512i) -> __m512i {
 
 #[inline]
 #[target_feature(enable = "avx512f")]
-#[cfg_attr(test, assert_instr(vprorq))]
-pub unsafe fn _mm256_ror_epi64(a: __m256i, imm8: i32) -> __m256i {
-    vprorq_256(a, imm8)
+#[cfg_attr(test, assert_instr(vpcmpeqd))]
+pub unsafe fn _mm512_cmpeq_epi32(a: __m512i, b: __m512i) -> __m512i {
+    transmute::<i32x16, _>(simd_eq(a.as_i32x16(), b.as_i32x16()))
 }
 
 #[inline]
 #[target_feature(enable = "avx512f")]
-#[cfg_attr(test, assert_instr(vprorq))]
+#[cfg_attr(test, assert_instr(vpcmpeqq))]
+pub unsafe fn _mm512_cmpeq_epi64(a: __m512i, b: __m512i) -> __m512i {
+    transmute::<i64x8, _>(simd_eq(a.as_i64x8(), b.as_i64x8()))
+}
+
+#[inline]
+#[target_feature(enable = "avx512f")]
+#[cfg_attr(test, assert_instr(vpandq))]
+pub unsafe fn _mm512_and_si512(a: __m512i, b: __m512i) -> __m512i {
+    transmute(simd_and(a.as_i64x8(), b.as_i64x8()))
+}
+
+#[inline]
+#[target_feature(enable = "avx512f")]
+#[cfg_attr(test, assert_instr(vandnps))]
+pub unsafe fn _mm512_andnot_si512(a: __m512i, b: __m512i) -> __m512i {
+    let mut all_ones: __m512i = mem::uninitialized();
+    ptr::write_bytes(&mut all_ones, 0xff, 1);
+    transmute(simd_and(
+        simd_xor(a.as_i64x8(), all_ones.as_i64x8()),
+        b.as_i64x8(),
+    ))
+}
+
+#[inline]
+#[target_feature(enable = "avx512f,avx512vl")]
+#[cfg_attr(test, assert_instr(vprord, imm8 = 3))]
+#[rustc_args_required_const(1)]
+pub unsafe fn _mm256_ror_epi32(a: __m256i, imm8: i32) -> __m256i {
+    macro_rules! call {
+        ($imm8:expr) => {
+            vprord_256(a, $imm8)
+        };
+    }
+    constify_imm8!(imm8, call)
+}
+
+#[inline]
+#[target_feature(enable = "avx512f,avx512vl")]
+#[cfg_attr(test, assert_instr(vprorq, imm8 = 3))]
+#[rustc_args_required_const(1)]
+pub unsafe fn _mm256_ror_epi64(a: __m256i, imm8: i32) -> __m256i {
+    macro_rules! call {
+        ($imm8:expr) => {
+            vprorq_256(a, $imm8)
+        };
+    }
+    constify_imm8!(imm8, call)
+}
+
+#[inline]
+#[target_feature(enable = "avx512f")]
+#[cfg_attr(test, assert_instr(vprord, imm8 = 3))]
+#[rustc_args_required_const(1)]
+pub unsafe fn _mm512_ror_epi32(a: __m512i, imm8: i32) -> __m512i {
+    macro_rules! call {
+        ($imm8:expr) => {
+            vprord_512(a, $imm8)
+        };
+    }
+    constify_imm8!(imm8, call)
+}
+
+#[inline]
+#[target_feature(enable = "avx512f")]
+#[cfg_attr(test, assert_instr(vprorq, imm8 = 3))]
+#[rustc_args_required_const(1)]
 pub unsafe fn _mm512_ror_epi64(a: __m512i, imm8: i32) -> __m512i {
-    vprorq_512(a, imm8)
+    macro_rules! call {
+        ($imm8:expr) => {
+            vprorq_512(a, $imm8)
+        };
+    }
+    constify_imm8!(imm8, call)
 }
 
 #[allow(improper_ctypes)]
 extern "C" {
+    #[link_name = "llvm.x86.avx512.pror.d.256"]
+    fn vprord_256(a: __m256i, imm8: i32) -> __m256i;
     #[link_name = "llvm.x86.avx512.pror.q.256"]
     fn vprorq_256(a: __m256i, imm8: i32) -> __m256i;
+    #[link_name = "llvm.x86.avx512.pror.d.512"]
+    fn vprord_512(a: __m512i, imm8: i32) -> __m512i;
     #[link_name = "llvm.x86.avx512.pror.q.512"]
     fn vprorq_512(a: __m512i, imm8: i32) -> __m512i;
 }
@@ -225,5 +322,39 @@ mod tests {
             0,
         );
         assert_eq_m512i(r, e);
+    }
+
+    SOMETHING ABOUT THESE ROTATIONS ISNT WORKING -- the 32 bit ones seem to get the 64 bit instructions
+    #[simd_test(enable = "avx512f,avx512vl")]
+    unsafe fn test_mm256_ror_epi32() {
+        let a: [u32; 8] = [0, 1, 2, 4, 8, 16, 32, 64];
+        let b: [u32; 8] = transmute(_mm256_ror_epi32(transmute(a), 1));
+        assert_eq!(b, [0, 2147483648, 1, 2, 4, 8, 16, 32]);
+    }
+
+    #[simd_test(enable = "avx512f,avx512vl")]
+    unsafe fn test_mm256_ror_epi64() {
+        let a: [u64; 4] = [0, 1, 2, 4];
+        let b: [u64; 4] = transmute(_mm256_ror_epi64(transmute(a), 1));
+        assert_eq!(b, [0, 9223372036854775808, 1, 2]);
+    }
+
+    #[simd_test(enable = "avx512f")]
+    unsafe fn test_mm512_ror_epi32() {
+        let a: [u32; 16] = [
+            0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384,
+        ];
+        let b: [u32; 16] = transmute(_mm512_ror_epi32(transmute(a), 1));
+        assert_eq!(
+            b,
+            [0, 2147483648, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192]
+        );
+    }
+
+    #[simd_test(enable = "avx512f")]
+    unsafe fn test_mm512_ror_epi64() {
+        let a: [u64; 8] = [0, 1, 2, 4, 8, 16, 32, 64];
+        let b: [u64; 8] = transmute(_mm512_ror_epi64(transmute(a), 1));
+        assert_eq!(b, [0, 9223372036854775808, 1, 2, 4, 8, 16, 32]);
     }
 }
