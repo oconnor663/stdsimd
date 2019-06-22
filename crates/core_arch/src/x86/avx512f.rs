@@ -6,13 +6,6 @@ use crate::{
 #[cfg(test)]
 use stdsimd_test::assert_instr;
 
-#[inline]
-#[target_feature(enable = "avx512f")]
-#[cfg_attr(test, assert_instr(vpaddq))]
-pub unsafe fn _mm512_add_epi64(a: __m512i, b: __m512i) -> __m512i {
-    transmute(simd_add(a.as_i64x8(), b.as_i64x8()))
-}
-
 /// Computes the absolute values of packed 32-bit integers in `a`.
 ///
 /// [Intel's documentation](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#avx512techs=AVX512F&expand=33,34,4990,33&text=_mm512_abs_epi32)
@@ -99,6 +92,35 @@ pub unsafe fn _mm512_setr_epi32(
 #[target_feature(enable = "avx512f")]
 pub unsafe fn _mm512_set1_epi64(a: i64) -> __m512i {
     transmute(i64x8::splat(a))
+}
+
+#[inline]
+#[target_feature(enable = "avx512f")]
+#[cfg_attr(test, assert_instr(vpaddq))]
+pub unsafe fn _mm512_add_epi64(a: __m512i, b: __m512i) -> __m512i {
+    transmute(simd_add(a.as_i64x8(), b.as_i64x8()))
+}
+
+#[inline]
+#[target_feature(enable = "avx512f")]
+#[cfg_attr(test, assert_instr(vprorq))]
+pub unsafe fn _mm256_ror_epi64(a: __m256i, imm8: i32) -> __m256i {
+    vprorq_256(a, imm8)
+}
+
+#[inline]
+#[target_feature(enable = "avx512f")]
+#[cfg_attr(test, assert_instr(vprorq))]
+pub unsafe fn _mm512_ror_epi64(a: __m512i, imm8: i32) -> __m512i {
+    vprorq_512(a, imm8)
+}
+
+#[allow(improper_ctypes)]
+extern "C" {
+    #[link_name = "llvm.x86.avx512.pror.q.256"]
+    fn vprorq_256(a: __m256i, imm8: i32) -> __m256i;
+    #[link_name = "llvm.x86.avx512.pror.q.512"]
+    fn vprorq_512(a: __m512i, imm8: i32) -> __m512i;
 }
 
 #[cfg(test)]
